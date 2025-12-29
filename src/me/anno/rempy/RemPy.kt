@@ -2,6 +2,7 @@ package me.anno.rempy
 
 import me.anno.Time
 import me.anno.engine.WindowRenderFlags.showFPS
+import me.anno.engine.history.StringHistory
 import me.anno.fonts.Font
 import me.anno.gpu.drawing.DrawRectangles
 import me.anno.gpu.drawing.DrawRounded
@@ -19,6 +20,8 @@ import me.anno.io.files.InvalidRef
 import me.anno.io.files.Reference.getReference
 import me.anno.rempy.animation.Image
 import me.anno.rempy.script.ScriptParser
+import me.anno.rempy.toml.TomlReader
+import me.anno.rempy.toml.TomlWriter
 import me.anno.rempy.vm.RenPyRuntime
 import me.anno.ui.Panel
 import me.anno.ui.base.components.AxisAlignment
@@ -75,8 +78,22 @@ fun main() {
         }
     }
 
-    var deltaTime = 0f
+    var deltaTime = 1f
     val frameRate = 30f
+
+    // todo history seems weird...
+    // todo add limit to history...
+    var allowApply = false
+    val history = object : StringHistory() {
+        override fun apply(prev: String, curr: String) {
+            if (allowApply && curr.isNotEmpty()) {
+                player.loadState(TomlReader.read(curr))
+            }
+            // todo parse the state, apply the state
+        }
+    }
+
+    // todo at the start, ask for the player's name
 
     // todo support extra line height...
     val font = Font("Times New Roman", 20f)
@@ -84,7 +101,9 @@ fun main() {
     var hoveredOption = -1
 
     testPureUI("RenPy", TestDrawPanel {
-        val forward = if (player.menu == null) {
+        showFPS = false
+
+        val forward = !history.isEmpty() && if (player.menu == null) {
             (Input.wasKeyPressed(' ') ||
                     Input.wasKeyPressed(Key.BUTTON_LEFT) ||
                     Input.wasKeyPressed(Key.KEY_ARROW_RIGHT))
@@ -92,14 +111,30 @@ fun main() {
             Input.wasKeyPressed(Key.BUTTON_LEFT) && hoveredOption != -1
         }
 
-        deltaTime += Time.deltaTime.toFloat()
-        if (deltaTime > 1f / frameRate || forward) {
-            player.menuIndex = hoveredOption
-            player.update(forward)
-            deltaTime = 0f
-        }
+        val backward = !forward && (
+                Input.wasKeyPressed(Key.BUTTON_RIGHT) ||
+                        Input.wasKeyPressed(Key.KEY_ARROW_LEFT) ||
+                        Input.wasKeyPressed(Key.KEY_BACKSPACE))
 
-        showFPS = false
+        if (backward) {
+
+            allowApply = true
+            history.undo()
+            allowApply = false
+
+        } else {
+            deltaTime += Time.deltaTime.toFloat()
+            if (deltaTime > 1f / frameRate || forward) {
+                player.menuIndex = hoveredOption
+                player.update(forward)
+
+                if (history.isEmpty() || forward) {
+                    history.put(TomlWriter.write(player.saveState()))
+                }
+
+                deltaTime = 0f
+            }
+        }
 
         val background = player.background
         if (background != null) {

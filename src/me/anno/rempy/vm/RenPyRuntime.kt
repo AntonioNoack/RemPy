@@ -81,12 +81,14 @@ class RenPyRuntime(val script: Script) {
             is Command.IfBlock -> {
                 for (b in command.branches) {
                     if (b.condition == null || eval.eval(b.condition) == true) {
-                        index = script.labels[b.targetLabel]!!
+                        index = script.labels[b.targetLabel]
+                            ?: throw IllegalStateException("Missing label ${b.targetLabel}")
                         break
                     }
                 }
             }
-            is Command.Jump -> index = script.labels[command.label]!!
+            is Command.Jump -> index = script.labels[command.label]
+                ?: throw IllegalStateException("Missing label ${command.label}")
             is Command.Label -> { /* just jump over it */
             }
             is Command.Music -> {

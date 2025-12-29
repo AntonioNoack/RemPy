@@ -2,8 +2,13 @@ package me.anno.rempy.script
 
 import me.anno.rempy.animation.Image
 import me.anno.rempy.script.expr.ExprParser
+import org.apache.logging.log4j.LogManager
 
 class ScriptParser(val lines: List<String>) {
+
+    companion object {
+        private val LOGGER = LogManager.getLogger(ScriptParser::class)
+    }
 
     val commands = ArrayList<Command>()
     val labels = HashMap<String, Int>()
@@ -87,6 +92,7 @@ class ScriptParser(val lines: List<String>) {
                     }
                 }
 
+                if (choices.size <= 1) LOGGER.warn("Only ${choices.size} choices? ${choices.map { it.text }}")
                 check(labels.put(endLabel, commands.size) == null)
                 return
             }

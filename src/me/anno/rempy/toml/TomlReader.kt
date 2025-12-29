@@ -19,13 +19,17 @@ object TomlReader {
             if (line.startsWith("[")) {
                 section = line.trim('[', ']'); continue
             }
+            if ('=' !in line) continue
             val (k, v) = line.split("=")
             when (section) {
                 "" -> if (k == "index") index = v.toInt()
                 "variables" -> vars[k] = v.trim('"')
                 "scene" -> when (k) {
                     "background" -> bg = Image.parse(v)
-                    "shownImages" -> shownImages = v.trim('[', ']').split(",").map { Image.parse(it) }
+                    "shownImages" -> shownImages = v.trim('[', ']')
+                        .split(",")
+                        .filter { it.isNotEmpty() }
+                        .map { Image.parse(it) }
                     "currentText" -> currentText = v.trim('"')
                 }
                 "menu" -> if (k == "selected") menu = MenuState(emptyList(), v.toInt())
