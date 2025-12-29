@@ -1,8 +1,5 @@
 package me.anno.rempy.vm
 
-import me.anno.input.Input
-import me.anno.input.Key
-import me.anno.maths.Maths.clamp
 import me.anno.rempy.animation.Image
 import me.anno.rempy.script.Command
 import me.anno.rempy.script.Script
@@ -18,52 +15,67 @@ class RenPyRuntime(val script: Script) {
     private val interpolator = TextInterpolator(eval)
 
     var background: Image? = null
-    var shownImages = LinkedHashMap<String, Image>()
+    var images = LinkedHashMap<String, Image>()
 
-    var currentText: Command.Say? = null
-    var currentMenu: Command.Menu? = null
+    var text: Command.Say? = null
+    var menu: Command.Menu? = null
     var menuIndex = 0
 
     fun update(advance: Boolean) {
         background?.transition?.update()
-        for ((_, image) in shownImages) {
-            image.transition?.update()
+        for ((_, image) in images) {
+            image.transition.update()
         }
 
-        if (currentMenu != null) {
-            if (Input.wasKeyPressed(Key.KEY_ARROW_UP)) menuIndex--
-            if (Input.wasKeyPressed(Key.KEY_ARROW_DOWN)) menuIndex++
-            menuIndex = clamp(menuIndex, 0, currentMenu!!.choices.lastIndex)
-            if (advance) {
-                index = script.labels[currentMenu!!.choices[menuIndex].target]!!
-                currentMenu = null
-            }
-            return
+        val menu = menu
+        if (menu != null) {
+            val choice = menu.choices.getOrNull(menuIndex)
+            if (advance && choice != null) {
+                // println("Options & targets: ${menu.choices.map { "${it.target}->${script.labels[it.target]}" }}")
+                index = script.labels[choice.target]!!
+                // println("Chose option $menuIndex -> ${choice.target} -> jumped to $index")
+                this.menu = null
+                this.text = null
+                runCommands()
+            } else return
         }
 
-        if (currentText != null && !advance) return
+        if (text != null && !advance) return
 
-        currentText = null
-        while (currentText == null && index < script.commands.size) {
+        text = null
+        runCommands()
+    }
+
+    fun runCommands() {
+        while ((text == null && menu == null) && index < script.commands.size) {
             val command = script.commands[index++]
             runNextCommand(command)
         }
     }
 
     fun runNextCommand(command: Command) {
+        // println("Executing command[${index-1}]: $command")
         when (command) {
             is Command.Scene -> {
                 background = command.image.clone()
+                images.clear()
             }
-            is Command.Say ->
-                currentText = command.copy(text = interpolator.interpolate(command.text))
+            is Command.Say -> {
+                text = Command.Say(
+                    if (command.speaker != null) interpolator.interpolate(command.speaker) else null,
+                    interpolator.interpolate(command.text)
+                )
+            }
             is Command.Show -> {
                 val image = command.image
-                shownImages[image.prefix] = image.clone()
+                val oldImage = images.remove(image.prefix)
+                val newImage = image.clone()
+                if (oldImage != null) newImage.transition.frameIndex = oldImage.transition.frameIndex
+                images[image.prefix] = newImage
             }
             is Command.Menu -> {
-                currentMenu = command
-                menuIndex = 0
+                menu = command
+                menuIndex = -1
             }
             is Command.SetVar -> vars.set(command.name, eval.eval(command.expr))
             is Command.IfBlock -> {
@@ -90,22 +102,22 @@ class RenPyRuntime(val script: Script) {
             index = index,
             variables = vars.snapshot(),
             background = background,
-            shownImages = shownImages.values.toList(),
-            currentText = currentText?.text,
-            currentMenu = currentMenu?.let { MenuState(it.choices, menuIndex) }
+            shownImages = images.values.toList(),
+            currentText = text?.text,
+            currentMenu = menu?.let { MenuState(it.choices, menuIndex) }
         )
 
     fun loadState(state: SaveState) {
         index = state.index
         vars.restore(state.variables)
         background = state.background
-        check(shownImages !== state.shownImages)
-        shownImages.clear()
+        check(images !== state.shownImages)
+        images.clear()
         for (image in state.shownImages) {
-            shownImages[image.prefix] = image
+            images[image.prefix] = image
         }
-        currentText = state.currentText?.let { Command.Say(null, it) }
-        currentMenu = state.currentMenu?.let { Command.Menu(it.choices) }
+        text = state.currentText?.let { Command.Say(null, it) }
+        menu = state.currentMenu?.let { Command.Menu(it.choices) }
         menuIndex = state.currentMenu?.selected ?: 0
     }
 }

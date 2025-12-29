@@ -17,24 +17,29 @@ class ExprEvaluator(private val vars: VariableStore) {
             else (a.anyToInt()) + (b.anyToInt())
         }
 
-        is Expr.Sub -> (eval(e.a).anyToInt()) - (eval(e.b).anyToInt())
-        is Expr.Mul -> (eval(e.a).anyToInt()) * (eval(e.b).anyToInt())
-        is Expr.Div -> (eval(e.a).anyToInt()) / (eval(e.b).anyToInt())
+        is Expr.Sub -> eval(e.a).anyToInt() - eval(e.b).anyToInt()
+        is Expr.Mul -> eval(e.a).anyToInt() * eval(e.b).anyToInt()
+        is Expr.Div -> eval(e.a).anyToInt() / eval(e.b).anyToInt()
         is Expr.Negative -> -eval(e.expr).anyToInt()
 
         is Expr.Equals -> eval(e.a) == eval(e.b)
         is Expr.NotEquals -> eval(e.a) != eval(e.b)
-        is Expr.Less -> (eval(e.a).anyToInt()) < (eval(e.b).anyToInt())
-        is Expr.Greater -> (eval(e.a).anyToInt()) > (eval(e.b).anyToInt())
+        is Expr.Less -> eval(e.a).anyToInt() < eval(e.b).anyToInt()
+        is Expr.Greater -> eval(e.a).anyToInt() > eval(e.b).anyToInt()
 
-        is Expr.And -> (eval(e.a).anyToBool()) && (eval(e.b).anyToBool())
-        is Expr.Or -> (eval(e.a).anyToBool()) || (eval(e.b).anyToBool())
-        is Expr.Not -> !(eval(e.expr).anyToBool())
+        is Expr.And -> eval(e.a).anyToBool() && eval(e.b).anyToBool()
+        is Expr.Or -> eval(e.a).anyToBool() || eval(e.b).anyToBool()
+        is Expr.Not -> !eval(e.expr).anyToBool()
 
         is Expr.Call -> when (e.name) {
             "addFriendly" -> addByLimit(e, -4)
             "addRomantically" -> addByLimit(e, 0)
             "addSexually" -> addByLimit(e, 2)
+            "subtract" -> {
+                val (a, b) = e.args
+                clamp(eval(a).anyToInt() - eval(b).anyToInt(), -5, +5)
+            }
+            "addSkill" -> addByLimit(e, -100)
             else -> throw IllegalStateException("Unknown function ${e.name}")
         }
     }

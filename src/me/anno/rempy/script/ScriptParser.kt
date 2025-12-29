@@ -63,7 +63,7 @@ class ScriptParser(val lines: List<String>) {
                 commands += Command.Menu(choices)
                 i++
                 while (i < lines.size && lines[i].startsWith(subIndent)) {
-                    val option = lines[i++]
+                    val option = lines[i]
                     var optionDepth = 0
                     while (optionDepth < line.length && option[optionDepth].isWhitespace()) {
                         optionDepth++
@@ -74,12 +74,13 @@ class ScriptParser(val lines: List<String>) {
 
                     val idx = option.indexOf(": jump ")
                     if (idx >= 0) {
-                        val optionText = option.substring(optionDepth, idx)
+                        val optionText = option.substring(optionDepth + 1, idx - 1)
                         val jumpTarget = option.substring(idx + ": jump ".length).trim()
                         commands += Command.Jump(jumpTarget)
                         choices += Command.MenuChoice(optionText, ifLabel)
+                        i++
                     } else {
-                        val optionText = option.substring(optionDepth)
+                        val optionText = option.substring(optionDepth + 1, option.length - 2)
                         val subIndent = option.substring(0, optionDepth) + " "
                         readCommandsInIndentedBlock(subIndent, endLabel)
                         choices += Command.MenuChoice(optionText, ifLabel)
