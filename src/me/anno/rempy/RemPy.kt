@@ -2,7 +2,6 @@ package me.anno.rempy
 
 import me.anno.Time
 import me.anno.engine.WindowRenderFlags.showFPS
-import me.anno.engine.history.StringHistory
 import me.anno.fonts.Font
 import me.anno.gpu.drawing.DrawRectangles
 import me.anno.gpu.drawing.DrawRounded
@@ -20,8 +19,6 @@ import me.anno.io.files.InvalidRef
 import me.anno.io.files.Reference.getReference
 import me.anno.rempy.animation.Image
 import me.anno.rempy.script.ScriptParser
-import me.anno.rempy.toml.TomlReader
-import me.anno.rempy.toml.TomlWriter
 import me.anno.rempy.vm.RenPyRuntime
 import me.anno.ui.Panel
 import me.anno.ui.base.components.AxisAlignment
@@ -83,15 +80,7 @@ fun main() {
 
     // todo history seems weird...
     // todo add limit to history...
-    var allowApply = false
-    val history = object : StringHistory() {
-        override fun apply(prev: String, curr: String) {
-            if (allowApply && curr.isNotEmpty()) {
-                player.loadState(TomlReader.read(curr))
-            }
-            // todo parse the state, apply the state
-        }
-    }
+    val history = History()
 
     // todo at the start, ask for the player's name
 
@@ -118,9 +107,8 @@ fun main() {
 
         if (backward) {
 
-            allowApply = true
-            history.undo()
-            allowApply = false
+            val newState = history.undo()
+            player.loadState(newState)
 
         } else {
             deltaTime += Time.deltaTime.toFloat()
@@ -129,7 +117,7 @@ fun main() {
                 player.update(forward)
 
                 if (history.isEmpty() || forward) {
-                    history.put(TomlWriter.write(player.saveState()))
+                    history.push(player.saveState())
                 }
 
                 deltaTime = 0f
