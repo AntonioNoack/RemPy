@@ -77,7 +77,6 @@ class ScriptParser(text: String) {
                 i++
                 while (i < lines.size && lines[i].startsWith(subIndent)) {
                     val option = lines[i]
-                    check(':' in option)
                     val optionDepth = getDepth(option)
 
                     val ifLabel = newLabel()
