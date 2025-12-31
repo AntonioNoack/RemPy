@@ -4,11 +4,14 @@ import me.anno.rempy.animation.Image
 import me.anno.rempy.script.expr.ExprParser
 import org.apache.logging.log4j.LogManager
 
-class ScriptParser(val lines: List<String>) {
+class ScriptParser(text: String) {
 
     companion object {
         private val LOGGER = LogManager.getLogger(ScriptParser::class)
     }
+
+    private val lines = text
+        .lines().filter { it.isNotBlank() }
 
     val commands = ArrayList<Command>()
     val labels = HashMap<String, Int>()
@@ -23,14 +26,19 @@ class ScriptParser(val lines: List<String>) {
         return list
     }
 
+    fun getDepth(line: String): Int {
+        var lineDepth = 0
+        while (lineDepth < line.length && line[lineDepth].isWhitespace()) {
+            lineDepth++
+        }
+        return lineDepth
+    }
+
     fun readLine() {
         var line = lines[i].trimEnd()
-        var depth = 0
-        while (depth < line.length && line[depth].isWhitespace()) {
-            depth++
-        }
-        val indent = line.substring(0, depth)
-        line = line.substring(depth)
+        val lineDepth = getDepth(line)
+        val indent = line.substring(0, lineDepth)
+        line = line.substring(lineDepth)
 
         when {
             line.isEmpty() || line.startsWith("# ") || line.startsWith("```") -> {}
@@ -63,16 +71,14 @@ class ScriptParser(val lines: List<String>) {
             }
             line == "menu:" -> {
                 val choices = ArrayList<Command.MenuChoice>()
-                val subIndent = "$indent "
+                val subIndent = "$indent  "
                 val endLabel = newLabel()
                 commands += Command.Menu(choices)
                 i++
                 while (i < lines.size && lines[i].startsWith(subIndent)) {
                     val option = lines[i]
-                    var optionDepth = 0
-                    while (optionDepth < line.length && option[optionDepth].isWhitespace()) {
-                        optionDepth++
-                    }
+                    check(':' in option)
+                    val optionDepth = getDepth(option)
 
                     val ifLabel = newLabel()
                     check(labels.put(ifLabel, commands.size) == null)
@@ -83,11 +89,11 @@ class ScriptParser(val lines: List<String>) {
                         val jumpTarget = option.substring(idx + ": jump ".length).trim()
                         commands += Command.Jump(jumpTarget)
                         choices += Command.MenuChoice(optionText, ifLabel)
-                        i++
+                        i++ // skip this line
                     } else {
-                        val optionText = option.substring(optionDepth + 1, option.length - 2)
+                        val optionText = option.substring(optionDepth + 1, option.length - 2) // +1,-1 to remove quotes
                         val subIndent = option.substring(0, optionDepth) + " "
-                        readCommandsInIndentedBlock(subIndent, endLabel)
+                        readCommandsInIndentedBlock(subIndent, endLabel) // line itself is skipped inside here
                         choices += Command.MenuChoice(optionText, ifLabel)
                     }
                 }
@@ -98,7 +104,7 @@ class ScriptParser(val lines: List<String>) {
             }
             line.startsWith("if ") -> {
                 val branches = ArrayList<Command.IfBranch>()
-                val subIndent = "$indent "
+                val subIndent = "$indent  "
 
                 val endLabel = newLabel()
                 commands += Command.IfBlock(branches, endLabel)
@@ -112,7 +118,7 @@ class ScriptParser(val lines: List<String>) {
                 branches += Command.IfBranch(condition, ifLabel)
 
                 while (lines[i].startsWith(indent + "elif ")) {
-                    val condition = parseExpr(lines[i].substring(depth + 5).removeSuffix(":"))
+                    val condition = parseExpr(lines[i].substring(lineDepth + 5).removeSuffix(":"))
                     val elifLabel = newLabel()
                     check(labels.put(elifLabel, commands.size) == null)
 
